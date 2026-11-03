@@ -51,3 +51,54 @@ delete `~/Library/Application Support/akses-sync`.
 
 If the repository is private, use an authenticated Git client to clone it, then
 run `bash Sync-dist/install.sh`; the public download command requires a public repo.
+
+## Windows version
+
+Requires Windows 10/11, Windows PowerShell 5.1+, and Python 3.10+ with pip/venv.
+Install Python from https://www.python.org/downloads/windows/ first.
+Run this in **PowerShell as your normal user**:
+
+```powershell
+Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/Masozee/akses/main/scripts/install-sync.ps1' -OutFile "$env:TEMP\install-akses-sync.ps1"; powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\install-akses-sync.ps1"
+```
+
+Alternatively, download/extract this repository and run
+`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Windows-dist\install.ps1`.
+The execution-policy override applies only to that process; managed Windows policy
+may prevent unsigned scripts from running.
+
+The installer prompts for your server/account, installs into
+`%LOCALAPPDATA%\akses-sync`, creates **Akses Sync** in the Start menu, and registers
+a per-user daily **03:00** task. Windows must be awake, you must be logged in, and
+Task Scheduler's default battery restrictions apply. No sync runs during installation.
+The task uses an interactive user principal and prevents overlapping scheduled runs;
+see [Microsoft's task settings documentation](https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtasksettingsset).
+
+Windows scans Desktop, Downloads, Documents and Pictures, resolving redirected
+folders such as OneDrive. Edit `scan_dirs` in the local `config.json` to add or
+remove folders. Cloud-only files may download when opened; ensure intended images
+are available offline. Windows does not read Apple Photos databases or macOS chat
+containers. All candidate images go to the server before its filtering occurs.
+
+Credentials are plaintext in local `config.json`, protected by a Windows ACL
+restricted to your user and SYSTEM. Reinstall preserves configuration. This is a
+Python-backed Windows application, not a standalone signed `.exe`.
+
+```powershell
+# Preview candidates; contacts the server but does not upload images.
+& "$env:LOCALAPPDATA\akses-sync\venv\Scripts\python.exe" "$env:LOCALAPPDATA\akses-sync\run-sync.py" --dry-run
+
+# Upload at most five new images.
+& "$env:LOCALAPPDATA\akses-sync\venv\Scripts\python.exe" "$env:LOCALAPPDATA\akses-sync\run-sync.py" --limit=5
+
+# View logs.
+Get-Content "$env:LOCALAPPDATA\akses-sync\sync.log" -Tail 50
+
+# Uninstall (keeps credentials, cache and logs; add -Purge to delete them).
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\akses-sync\uninstall.ps1"
+```
+
+Offline tests: `python3 -m unittest discover -s tests -v`.
+Platform selection, Windows configuration encoding, scan deduplication, cache
+storage, and existing Mac paths are covered. Native Windows installation, folder
+ACLs, shortcuts, and Task Scheduler still require validation on Windows.

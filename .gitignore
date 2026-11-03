@@ -15,3 +15,6 @@ __pycache__/
 *.pyc
 venv/
 config.json
+
+!/Windows-dist/
+!/tests/

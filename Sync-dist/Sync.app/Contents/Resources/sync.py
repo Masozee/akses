@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scan common image locations on this Mac and sync them to the akses backend.
+"""Scan common image locations on this computer and sync them to the akses backend.
 
 Server keeps only images its NSFW detector flags; everything else is discarded there.
 A local cache skips files already processed so non-NSFW images aren't re-uploaded daily.
@@ -15,9 +15,12 @@ try:
 except Exception:
     pass
 
-CONFIG_FILE = Path.home() / "Library/Application Support/akses-sync/config.json"
+IS_WINDOWS = sys.platform == "win32"
+SUPPORT = (Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData/Local"))) / "akses-sync"
+           if IS_WINDOWS else Path.home() / "Library/Application Support/akses-sync")
+CONFIG_FILE = SUPPORT / "config.json"
 try:
-    config = json.loads(CONFIG_FILE.read_text())
+    config = json.loads(CONFIG_FILE.read_text(encoding="utf-8-sig"))
     BASE_URL = config["base_url"].rstrip("/")
     EMAIL = config["email"]
     PASSWORD = config["password"]
@@ -26,7 +29,7 @@ except (OSError, ValueError, KeyError):
 
 HOME = Path.home()
 LIBRARY = str(HOME / "Pictures/Photos Library.photoslibrary")
-CACHE_FILE = HOME / ".akses_sync_cache.json"
+CACHE_FILE = SUPPORT / "cache.json" if IS_WINDOWS else HOME / ".akses_sync_cache.json"
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".webp", ".gif", ".bmp", ".tiff", ".tif"}
 MAX_BYTES = 50 * 1024 * 1024  # skip files larger than 50MB
@@ -46,6 +49,13 @@ SCAN_GLOBS = [
     "Library/Group Containers/*.whatsapp*/**/Media/**",
     "Library/Group Containers/*telegram*/**",
 ]
+
+if IS_WINDOWS:
+    # Installer resolves redirected Windows folders (including OneDrive).
+    SCAN_DIRS = [Path(p) for p in config.get("scan_dirs", [])]
+    if not SCAN_DIRS:
+        raise SystemExit("No Windows scan folders configured. Rerun the installer.")
+    SCAN_GLOBS = []
 
 # Directory names never worth scanning (build junk, caches, VCS).
 SKIP_DIR_NAMES = {".git", "node_modules", ".Trash", "Caches", ".cache", "__pycache__", "DerivedData"}
@@ -119,6 +129,7 @@ def iter_fs_images():
     for pat in SCAN_GLOBS:
         roots += [p for p in HOME.glob(pat) if p.is_dir()]
     seen_roots = set()
+    seen_files = set()
     for root in roots:
         rp = os.path.realpath(root)
         if rp in seen_roots or LIBRARY in rp:
@@ -131,7 +142,11 @@ def iter_fs_images():
             dirnames[:] = [d for d in dirnames if d not in SKIP_DIR_NAMES and not d.endswith(".photoslibrary")]
             for name in filenames:
                 if os.path.splitext(name)[1].lower() in IMAGE_EXTS:
-                    yield os.path.join(dirpath, name)
+                    path = os.path.join(dirpath, name)
+                    identity = os.path.normcase(os.path.realpath(path))
+                    if identity not in seen_files:
+                        seen_files.add(identity)
+                        yield path
 
 
 def ensure_local(photo, download_dir):
@@ -146,6 +161,8 @@ def ensure_local(photo, download_dir):
 
 def collect_photos():
     """Own Photos-library images (skip Shared Album / 'Shared with You')."""
+    if IS_WINDOWS:
+        return []
     try:
         import osxphotos
     except ImportError:
