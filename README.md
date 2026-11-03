@@ -2,8 +2,7 @@
 
 Sync.app backs up images from your Mac to your akses server. It scans Photos,
 Desktop, Downloads, Documents, iCloud Drive, Messages attachments, and supported
-WhatsApp/Telegram folders. Images are uploaded before the server filters them;
-the server is expected to retain only NSFW-flagged images. Use your own Mac and account.
+WhatsApp/Telegram folders, then uploads them to the server. Use your own Mac and account.
 
 ## Install on another MacBook
 
