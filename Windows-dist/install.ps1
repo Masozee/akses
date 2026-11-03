@@ -1,9 +1,11 @@
+param([string]$PackageExecutable)
 # Windows PowerShell 5.1 or newer. Run as the user whose images will be synced.
 $ErrorActionPreference = 'Stop'
 if ($env:OS -ne 'Windows_NT') { throw 'This installer requires Windows.' }
 $root = Join-Path $env:LOCALAPPDATA 'akses-sync'
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $taskName = "Akses Sync - $sid"
+if (-not $PackageExecutable) {
 # Probe real interpreters; Windows Store aliases can exist without Python installed.
 $python = $null
 foreach ($candidate in @('py', 'python', 'python3')) {
@@ -15,6 +17,7 @@ foreach ($candidate in @('py', 'python', 'python3')) {
     }
 }
 if (-not $python) { throw 'Install Python 3.10+ from https://www.python.org/downloads/windows/ and rerun.' }
+}
 New-Item -ItemType Directory -Path $root -Force | Out-Null
 # Protect credentials and code with a fresh ACL for this user and SYSTEM only.
 $acl = New-Object Security.AccessControl.DirectorySecurity
@@ -49,6 +52,14 @@ if (-not (Test-Path $configPath)) {
 } else { Write-Host "Keeping configuration: $configPath" }
 $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 if ($existing -and $existing.State -eq 'Running') { throw 'Sync is running. Stop it in Task Scheduler before updating.' }
+if ($PackageExecutable) {
+    $installedExe = Join-Path $root 'AksesSync.exe'
+    if ([IO.Path]::GetFullPath($PackageExecutable) -ne [IO.Path]::GetFullPath($installedExe)) {
+        Copy-Item -LiteralPath $PackageExecutable -Destination $installedExe -Force
+    }
+    $launchTarget = $installedExe
+    $launchArguments = '--sync'
+} else {
 & $python -m venv (Join-Path $root 'venv')
 if ($LASTEXITCODE -ne 0) { throw 'Python environment creation failed.' }
 $venvPython = Join-Path $root 'venv\Scripts\python.exe'
@@ -56,21 +67,24 @@ $venvPython = Join-Path $root 'venv\Scripts\python.exe'
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
 Copy-Item (Join-Path $PSScriptRoot '..\Sync-dist\Sync.app\Contents\Resources\sync.py') $root -Force
 Copy-Item (Join-Path $PSScriptRoot 'run-sync.py') $root -Force
-Copy-Item (Join-Path $PSScriptRoot 'uninstall.ps1') $root -Force
 $runner = Join-Path $root 'run-sync.py'
-$action = New-ScheduledTaskAction -Execute $venvPython -Argument ('"' + $runner + '"') -WorkingDirectory $root
+    $launchTarget = $venvPython
+    $launchArguments = '"' + $runner + '"'
+}
+Copy-Item (Join-Path $PSScriptRoot 'uninstall.ps1') $root -Force
+$action = New-ScheduledTaskAction -Execute $launchTarget -Argument $launchArguments -WorkingDirectory $root
 $trigger = New-ScheduledTaskTrigger -Daily -At '03:00'
 $principal = New-ScheduledTaskPrincipal -UserId $sid -LogonType Interactive -RunLevel Limited
 $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 12)
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Back up this user''s configured image folders to their akses server daily at 03:00.' -Force | Out-Null
 $shell = New-Object -ComObject WScript.Shell
 $link = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Programs')) 'Akses Sync.lnk'))
-$link.TargetPath = $venvPython
-$link.Arguments = '"' + $runner + '"'
+$link.TargetPath = $launchTarget
+$link.Arguments = $launchArguments
 $link.WorkingDirectory = $root
 $link.Description = 'Upload images to your configured akses server'
 $link.Save()
 Write-Host "Installed in $root. Start menu: Akses Sync. Daily schedule: 03:00 while logged in and awake."
 Write-Host 'No images uploaded during installation. Credentials are stored locally with a restricted Windows ACL.'
 Write-Host "Log: $root\sync.log"
-Write-Host "Preview without uploading images: & `"$venvPython`" `"$runner`" --dry-run"
+Write-Host "Preview without uploading images: & `"$launchTarget`" $launchArguments --dry-run"

@@ -18,3 +18,8 @@ config.json
 
 !/Windows-dist/
 !/tests/
+
+!/.github/
+/Windows-dist/build/
+/Windows-dist/dist/
+*.spec

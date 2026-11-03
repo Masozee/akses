@@ -1,0 +1,58 @@
+name: Build Windows EXE
+on:
+  workflow_dispatch:
+  push:
+    tags: ['windows-v*']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build dependencies
+        run: python -m pip install pyinstaller==6.16.0 requests==2.32.5
+      - name: Validate Python and PowerShell
+        shell: powershell
+        run: |
+          python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'Python tests failed' }
+          Get-ChildItem Windows-dist,scripts -Filter *.ps1 -Recurse | ForEach-Object {
+            $errors = $null; $tokens = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
+            if ($errors.Count) { throw ($errors | Out-String) }
+          }
+      - name: Build standalone executable
+        run: >-
+          python -m PyInstaller --noconfirm --clean --onefile --console
+          --name AksesSync --hidden-import requests --hidden-import certifi --hidden-import mimetypes --hidden-import hashlib
+          --add-data "Sync-dist/Sync.app/Contents/Resources/sync.py:."
+          --add-data "Windows-dist/install.ps1:."
+          --add-data "Windows-dist/uninstall.ps1:."
+          Windows-dist/akses_sync.py
+      - name: Test executable and checksum
+        shell: powershell
+        run: |
+          & .\dist\AksesSync.exe --version
+          if ($LASTEXITCODE -ne 0) { throw 'EXE launch failed' }
+          & .\dist\AksesSync.exe --self-test
+          if ($LASTEXITCODE -ne 0) { throw 'EXE self-test failed' }
+          $hash = (Get-FileHash .\dist\AksesSync.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  AksesSync.exe" | Set-Content .\dist\SHA256SUMS.txt -Encoding ascii
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AksesSync-Windows-x64
+          path: |
+            dist/AksesSync.exe
+            dist/SHA256SUMS.txt
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: powershell
+        run: |
+          gh release create $env:GITHUB_REF_NAME dist/AksesSync.exe dist/SHA256SUMS.txt --title "Akses Sync for Windows" --notes "Standalone Windows x64 app. Download AksesSync.exe and double-click to install and configure. Python is bundled. No images are uploaded during installation. Unsigned build."
+          if ($LASTEXITCODE -ne 0) { throw 'Release publishing failed' }

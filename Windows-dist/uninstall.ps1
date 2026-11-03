@@ -11,7 +11,7 @@ $link = Join-Path ([Environment]::GetFolderPath('Programs')) 'Akses Sync.lnk'
 Remove-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
 if ($Purge) { Remove-Item -LiteralPath $root -Recurse -Force }
 else {
-    foreach ($name in @('venv', 'sync.py', 'run-sync.py')) {
+    foreach ($name in @('venv', 'sync.py', 'run-sync.py', 'AksesSync.exe')) {
         $path = Join-Path $root $name
         if (Test-Path $path) { Remove-Item -LiteralPath $path -Recurse -Force }
     }

@@ -52,7 +52,35 @@ delete `~/Library/Application Support/akses-sync`.
 If the repository is private, use an authenticated Git client to clone it, then
 run `bash Sync-dist/install.sh`; the public download command requires a public repo.
 
-## Windows version
+## Standalone Windows EXE
+
+Download [AksesSync.exe](https://github.com/Masozee/akses/releases/latest/download/AksesSync.exe)
+and double-click it to install. **No Python installation is needed.** The setup
+console asks for your server and credentials, adds a Start menu shortcut, and
+schedules daily sync at 03:00. Installation does not upload images.
+
+This is an unsigned Windows x64 executable. Build checks and SHA-256 checksums
+are available in the [GitHub releases](https://github.com/Masozee/akses/releases).
+
+```powershell
+# Preview without uploading images after installation.
+& "$env:LOCALAPPDATA\akses-sync\AksesSync.exe" --sync --dry-run
+
+# Upload at most five new images.
+& "$env:LOCALAPPDATA\akses-sync\AksesSync.exe" --sync --limit=5
+```
+
+To update, download the new executable to Downloads and run it. Use the Start
+menu shortcut to run a backup. Running the downloaded EXE opens setup again.
+Uninstallation and scan-folder configuration are described below.
+
+The build workflow runs on Windows and bundles Python, requests, TLS certificates,
+and the sync engine using [PyInstaller](https://pyinstaller.org/en/stable/runtime-information.html).
+It checks PowerShell syntax, runs offline platform tests, and smoke-tests the EXE.
+Create a `windows-v*` tag to build and publish a release, or run **Build Windows EXE**
+in GitHub Actions to produce a downloadable artifact.
+
+## Windows source installation
 
 Requires Windows 10/11, Windows PowerShell 5.1+, and Python 3.10+ with pip/venv.
 Install Python from https://www.python.org/downloads/windows/ first.
@@ -81,8 +109,7 @@ are available offline. Windows does not read Apple Photos databases or macOS cha
 containers. All candidate images go to the server before its filtering occurs.
 
 Credentials are plaintext in local `config.json`, protected by a Windows ACL
-restricted to your user and SYSTEM. Reinstall preserves configuration. This is a
-Python-backed Windows application, not a standalone signed `.exe`.
+restricted to your user and SYSTEM. Reinstall preserves configuration. The source installation requires Python; the standalone EXE above bundles it.
 
 ```powershell
 # Preview candidates; contacts the server but does not upload images.
