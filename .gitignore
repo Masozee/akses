@@ -1,0 +1,17 @@
+# Publish only the Sync distribution and its installer.
+/*
+!/.gitignore
+!/README.md
+!/scripts/
+!/Sync-dist/
+/Sync-dist/*
+!/Sync-dist/Sync.app/
+!/Sync-dist/install.sh
+!/Sync-dist/uninstall.sh
+!/Sync-dist/configure.py
+!/Sync-dist/README.txt
+.DS_Store
+__pycache__/
+*.pyc
+venv/
+config.json

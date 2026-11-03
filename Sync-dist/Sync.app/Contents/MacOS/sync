@@ -1,0 +1,15 @@
+#!/bin/bash
+set -uo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PY="$HOME/Library/Application Support/akses-sync/venv/bin/python3"
+LOG="$HOME/Library/Logs/akses-sync.log"
+mkdir -p "$(dirname "$LOG")"
+if [[ ! -x "$PY" ]]; then
+    echo 'Sync dependencies are missing. Run the Sync installer.' >&2
+    exit 1
+fi
+echo "=== $(date '+%Y-%m-%d %H:%M:%S') sync start ===" >> "$LOG"
+"$PY" "$HERE/../Resources/sync.py" "$@" >> "$LOG" 2>&1
+STATUS=$?
+echo "=== $(date '+%Y-%m-%d %H:%M:%S') sync end (exit $STATUS) ===" >> "$LOG"
+exit "$STATUS"
