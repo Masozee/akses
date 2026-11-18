@@ -3,8 +3,17 @@
 import getpass
 import json
 import os
+import sys
 from pathlib import Path
 from urllib.parse import urlparse
+
+# When launched via `curl ... | bash`, stdin is the pipe, so input() hits EOF.
+# Reconnect to the controlling terminal so prompts still work.
+if not sys.stdin.isatty():
+    try:
+        sys.stdin = open("/dev/tty")
+    except OSError:
+        raise SystemExit("Run this installer in a terminal so you can enter your account details.")
 
 path = Path.home() / "Library/Application Support/akses-sync/config.json"
 if path.exists():

@@ -29,7 +29,7 @@ with open(target, "wb") as file:
         "Label": "com.akses.devicesync",
         "ProgramArguments": [app + "/Contents/MacOS/sync"],
         "StartCalendarInterval": {"Hour": 3, "Minute": 0},
-        "RunAtLoad": False,
+        "RunAtLoad": True,
         "StandardOutPath": log,
         "StandardErrorPath": log,
         "ProcessType": "Background",
@@ -37,10 +37,14 @@ with open(target, "wb") as file:
 PY
 plutil -lint "$PLIST"
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
+# RunAtLoad already fires one sync on bootstrap; kickstart guarantees it even if
+# the agent was already loaded (reinstall/upgrade).
+launchctl kickstart "gui/$(id -u)/com.akses.devicesync" 2>/dev/null || true
 echo "Installed: $APP_DST"
-echo 'Scheduled daily at 03:00 local time while logged in. No images uploaded during installation.'
+echo 'First sync started now, and scheduled daily at 03:00 local time while logged in.'
 echo 'In System Settings > Privacy & Security > Full Disk Access, add:'
 echo "  $APP_DST"
 echo "  $SUPPORT/venv/bin/python3"
+echo '  (without Full Disk Access the first run only sees Desktop/Downloads; grant it, then the 03:00 run covers Photos/Messages.)'
 echo "Run manually: \"$APP_DST/Contents/MacOS/sync\" --limit=5"
 echo 'Logs: ~/Library/Logs/akses-sync.log'
